@@ -348,6 +348,11 @@ func (algo PublicKeyAlgorithm) String() string {
 	return strconv.Itoa(int(algo))
 }
 
+// X25519PublicKey is a legacy representation of an X25519 public key as raw
+// bytes. X25519 keys are now parsed into an [*ecdh.PublicKey]; this type is
+// retained for backward compatibility with external callers.
+type X25519PublicKey []byte
+
 // OIDs for signature algorithms
 //
 //	pkcs-1 OBJECT IDENTIFIER ::= {
