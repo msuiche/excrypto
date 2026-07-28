@@ -31,18 +31,6 @@ type AlgorithmIdentifier struct {
 
 type RDNSequence []RelativeDistinguishedNameSET
 
-var attributeTypeNames = map[string]string{
-	"2.5.4.6":  "C",
-	"2.5.4.10": "O",
-	"2.5.4.11": "OU",
-	"2.5.4.3":  "CN",
-	"2.5.4.5":  "SERIALNUMBER",
-	"2.5.4.7":  "L",
-	"2.5.4.8":  "ST",
-	"2.5.4.9":  "STREET",
-	"2.5.4.17": "POSTALCODE",
-}
-
 // String returns a string representation of the sequence r,
 // roughly following the RFC 2253 Distinguished Names syntax.
 func (r RDNSequence) String() string {
@@ -50,7 +38,7 @@ func (r RDNSequence) String() string {
 	for i := 0; i < len(r); i++ {
 		rdn := r[len(r)-1-i]
 		if i > 0 {
-			buf.WriteByte(',')
+			buf.WriteString(", ")
 		}
 		for j, tv := range rdn {
 			if j > 0 {
@@ -58,19 +46,19 @@ func (r RDNSequence) String() string {
 			}
 
 			oidString := tv.Type.String()
-			typeName, ok := attributeTypeNames[oidString]
-			if !ok {
-				// RFC 2253 §2.4: if the value's ASN.1 type has a string
-				// representation, render it as a string; otherwise hex-encode
-				// the DER.
-				if _, ok := tv.Value.(string); !ok {
-					derBytes, err := asn1.Marshal(tv.Value)
-					if err == nil {
-						buf.WriteString(oidString)
-						buf.WriteString("=#")
-						buf.WriteString(hex.EncodeToString(derBytes))
-						continue // No value escaping necessary.
-					}
+			var typeName string
+			if oidName, ok := oidDotNotationToNames[oidString]; ok {
+				typeName = oidName.ShortName
+			}
+			if typeName == "" {
+				// If the OID has no known short name, hex-encode the DER
+				// representation of the value (RFC 2253 §2.4).
+				derBytes, err := asn1.Marshal(tv.Value)
+				if err == nil {
+					buf.WriteString(oidString)
+					buf.WriteString("=#")
+					buf.WriteString(hex.EncodeToString(derBytes))
+					continue // No value escaping necessary.
 				}
 
 				typeName = oidString
