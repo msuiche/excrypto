@@ -8,6 +8,7 @@ OREF=$(cat refs/crypto.hash)
 if [[ "${OREF}" == "" ]]; then 
     OREF=master
 fi
+NREF=${CRYPTO_UPSTREAM_REF:-master}
 
 rm -rf crypto.upstream/ && \
 git clone https://github.com/golang/go.git crypto.upstream/ || exit 1
@@ -34,7 +35,7 @@ rm -rf ./crypto.upstream/src/crypto/purego_test.go
 
 diff --exclude=.git -ruN  crypto.upstream/src/crypto/ crypto/ > crypto.diff
 
-(cd crypto.upstream && git checkout -- && git reset --hard && git checkout master) || exit 1
+(cd crypto.upstream && git checkout -- && git reset --hard && git checkout "${NREF}") || exit 1
 NREF=$(cd crypto.upstream/; git rev-parse HEAD)
 ./scripts/xcrypto_rewrite.sh ./crypto.upstream/src/crypto
 rm -rf ./crypto.upstream/src/crypto/rand

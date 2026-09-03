@@ -11,6 +11,7 @@ if [[ "${DIR}" == "" ]]; then
 fi
 
 rm -f ${DIR}/go.mod ${DIR}/go.sum
+rm -f ${DIR}/x509roots/fallback/go.mod ${DIR}/x509roots/fallback/go.sum
 
 # Build a sorted list of regular files, skipping any .git subdir entries.
 FILES=$(find "${DIR}/" -name .git -prune -o -type f -print)

@@ -233,6 +233,7 @@ func SetEnv(name, value string) {
 // the process environment. Excrypto extension; mirror of SetEnv used in
 // upstream tests via t.Cleanup.
 func ResetEnv() {
+	_ = os.Unsetenv("GODEBUG")
 	update("", os.Getenv("GODEBUG"))
 }
 
