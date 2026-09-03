@@ -38,8 +38,8 @@ const msgDisconnect = 1
 // disconnectMsg is the message that signals a disconnect. It is also
 // the error type returned from mux.Wait()
 type disconnectMsg struct {
-	Reason   uint32 `sshtype:"1"`
-	Message  string
+	Reason  uint32 `sshtype:"1"`
+	Message string
 	// Language is optional in practice: many real-world SSH implementations
 	// (especially embedded/non-conformant servers) omit the trailing language
 	// tag string from SSH_MSG_DISCONNECT, even though RFC 4253 §11.1 requires
