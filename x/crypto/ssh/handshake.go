@@ -105,6 +105,13 @@ type handshakeTransport struct {
 	// message.
 	requestKex chan struct{}
 
+	// requestKexSync carries synchronous (awaited) key change requests.
+	// Each requester is appended to syncKexWaiters and notified when the
+	// next key exchange completes or the loop exits. Both are owned by
+	// kexLoop.
+	requestKexSync chan chan error
+	syncKexWaiters []chan error
+
 	// If the other side requests or confirms a kex, its kexInit
 	// packet is sent here for the write loop to find it.
 	startKex    chan *pendingKex
@@ -145,10 +152,11 @@ func newHandshakeTransport(conn keyingTransport, config *Config, clientVersion, 
 		conn:          conn,
 		serverVersion: serverVersion,
 		clientVersion: clientVersion,
-		incoming:      make(chan []byte, chanSize),
-		requestKex:    make(chan struct{}, 1),
-		startKex:      make(chan *pendingKex),
-		kexLoopDone:   make(chan struct{}),
+		incoming:       make(chan []byte, chanSize),
+		requestKex:     make(chan struct{}, 1),
+		requestKexSync: make(chan chan error, 1),
+		startKex:       make(chan *pendingKex),
+		kexLoopDone:    make(chan struct{}),
 
 		config: config,
 	}
@@ -295,6 +303,19 @@ func (t *handshakeTransport) requestKeyExchange() {
 	}
 }
 
+// requestKeyExchangeSync requests a key change and blocks until the key
+// exchange completes (or the connection fails), returning the exchange's
+// error, if any. Multiple callers are all notified of the same exchange.
+func (t *handshakeTransport) requestKeyExchangeSync() error {
+	res := make(chan error, 1)
+	select {
+	case t.requestKexSync <- res:
+	case <-t.kexLoopDone:
+		return errors.New("ssh: connection closed")
+	}
+	return <-res
+}
+
 func (t *handshakeTransport) resetWriteThresholds() {
 	t.writePacketsLeft = packetRekeyThreshold
 	if t.config.RekeyThreshold > 0 {
@@ -321,6 +342,8 @@ write:
 				}
 			case <-t.requestKex:
 				break
+			case res := <-t.requestKexSync:
+				t.syncKexWaiters = append(t.syncKexWaiters, res)
 			}
 
 			if !sent {
@@ -374,6 +397,12 @@ write:
 
 		request.done <- t.writeError
 
+		// Notify synchronous key change requesters.
+		for _, w := range t.syncKexWaiters {
+			w <- t.writeError
+		}
+		t.syncKexWaiters = nil
+
 		// kex finished. Push packets that we received while
 		// the kex was in progress. Don't look at t.startKex
 		// and don't increment writtenSinceKex: if we trigger
@@ -399,6 +428,16 @@ write:
 	for request := range t.startKex {
 		request.done <- t.getWriteError()
 	}
+
+	// Fail any outstanding synchronous key change requests.
+	err := t.getWriteError()
+	if err == nil {
+		err = errors.New("ssh: connection closed")
+	}
+	for _, w := range t.syncKexWaiters {
+		w <- err
+	}
+	t.syncKexWaiters = nil
 
 	// Mark that the loop is done so that Close can return.
 	close(t.kexLoopDone)

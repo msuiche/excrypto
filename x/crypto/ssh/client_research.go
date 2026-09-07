@@ -129,6 +129,25 @@ func (uac *UnauthClientConn) clientHandshakeUnauth(dialAddress string) error {
 	return nil
 }
 
+// RequestKeyExchange initiates a client-requested key re-exchange (rekey)
+// on the underlying transport and blocks until the exchange completes,
+// returning the exchange's error, if any. On return, subsequent packets are
+// guaranteed to be sent over the rekeyed transport.
+//
+// This enables pre-authentication state-transition research, e.g. probing
+// how a server handles connection-protocol messages after a rekey that was
+// requested before userauth completed.
+func (uac *UnauthClientConn) RequestKeyExchange() error {
+	if uac.c == nil || uac.c.transport == nil {
+		return errors.New("ssh: no transport")
+	}
+	ht, ok := uac.c.transport.(*handshakeTransport)
+	if !ok {
+		return errors.New("ssh: transport does not support client-requested rekey")
+	}
+	return ht.requestKeyExchangeSync()
+}
+
 func (uac *UnauthClientConn) RequestUserAuth() (map[string][]byte, error) {
 	c := uac.c
 	extensions := make(map[string][]byte)
